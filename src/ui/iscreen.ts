@@ -1,6 +1,14 @@
 import { QWidget } from "@nodegui/nodegui";
 
 export interface IScreen {
-    centralWidget: QWidget
+    type: ScreenType
+    mainWidget: QWidget
     screenStyleSheet: string
+
+    init(data: any): void
+}
+
+export enum ScreenType {
+    StartScreen,
+    CreateServerScreen,
 }
