@@ -1,15 +1,23 @@
-import { initWindow } from './screen'
-import { startServer } from './server'
-import { StartScreen } from './ui/start-screen'
+import { initWindow } from './navigation'
 import { viewModel } from './viewmodel'
-
-var bonjour = require('bonjour')()
+import Bonjour from 'bonjour-service'
 
 initWindow(viewModel.defaultStartScreen())
 
-// browse for all http services
-bonjour.find({ type: 'http' }, function (service: any) {
-  console.log('Found an HTTP server:', service.name)
-  viewModel.addServer(service)
-  viewModel.printServers()
-})
+viewModel.browseServers()
+
+// // import the module
+// const mdns = require('mdns');
+ 
+// // watch all http servers
+// const browser = mdns.createBrowser(mdns.tcp('_quiz._tcp'));
+// browser.on('serviceUp', (service: any) => {
+//   viewModel.addServer(service)
+// });
+
+// browser.on('serviceDown', (service: any) => {
+//   viewModel.removeServer(service)
+// });
+
+// browser.start();
+ 
