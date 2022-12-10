@@ -1,27 +1,57 @@
 import { QListWidgetItem, ItemDataRole, QVariant, QListWidget } from "@nodegui/nodegui";
 import Bonjour, { Browser } from "bonjour-service";
+import { on } from "events";
+import { randomUUID } from "crypto"
 import MiniSignal from "mini-signals";
+import { Client } from "./client";
+import { IMessage } from "./messages/imessage";
 import { navigation } from "./navigation";
 import { Server } from "./server";
 import { CreateServerScreen } from "./ui/create-server-screen";
 import { IScreen, ScreenType } from "./ui/iscreen";
 import { StartScreen } from "./ui/start-screen";
+import { HelloMessage } from "./messages/hello-message";
+import { AnswerMessage } from "./messages/answer-message";
 
 
 class ViewModel {
     private static instance: ViewModel
 
-    public listSignal = new MiniSignal()
     public bonjour = new Bonjour()
-    public server = new Server(this.bonjour)
+    public server = new Server(this.bonjour, 12)
+    public client = new Client()
     public browser: Browser | undefined
-
+    
+    // Lobby
+    public serverListSignal = new MiniSignal()
     private servers: any[] = []
     private qServerItems: Set<QListWidgetItem> = new Set<QListWidgetItem>()
+    
+    // Server control panel
+    public playerListSignal = new MiniSignal()
+
+    // General
+    onClientConnect: () => void = () => {}
+    onClientDisconnect: () => void = () => {}
+
+    constructor() {
+        this.client.onConnect = () => this.onClientConnect()
+        this.client.onDisconnect = () => this.onClientDisconnect()
+
+        this.onClientConnect = () => {
+            console.log("Connected");
+        }
+
+        this.onClientDisconnect = () => {
+            navigation.goBackUntil(ScreenType.StartScreen)
+        }
+
+        this.server.onMessage = (msg, id) => this.serverOnMessage(msg, id)
+        this.client.onMessage = () => {}
+    }
 
     public browseServers() {
-        // browse for all http services
-        this.browser = this.bonjour.find({ type: '_quiz._tcp' })
+        this.browser = this.bonjour.find({ type: 'quiz'})
 
         this.browser.on("up", function (service: any) {
             console.log('Found an _quiz._tcp server:', service.name)
@@ -38,17 +68,12 @@ class ViewModel {
     }
 
     public createServer(name: string) {
-        var goodName = name.replace(/' '/g, ' ');
+        var goodName = name.replace(/' '/g, ' ').trim();
         this.server.start(goodName)
     }
 
-    public addServer(server: any) {
-        this.servers.push(server)
-        var qitem = new QListWidgetItem()
-        qitem.setText(server.name)
-        qitem.setData(ItemDataRole.UserRole, new QVariant(JSON.stringify(server)))
-        this.qServerItems.add(qitem)
-        this.listSignal.dispatch()
+    public updateServerPlayers() {
+        
     }
 
     public updateServices() {
@@ -64,19 +89,8 @@ class ViewModel {
                 this.qServerItems.add(qitem)
             }
 
-            this.listSignal.dispatch()
+            this.serverListSignal.dispatch()
         }
-    }
-
-    public removeServer(server: any) {
-        var idx = this.servers.indexOf(server)
-        if (idx > -1) this.servers.splice(idx, 1)
-        for (const qitem of this.qServerItems) {
-            var item = JSON.parse(qitem.data(ItemDataRole.UserRole).toString())
-            if (item.name == server.name)
-                this.qServerItems.delete(item)
-        }
-        this.listSignal.dispatch()
     }
 
     public printServers() {
@@ -95,12 +109,14 @@ class ViewModel {
     public defaultStartScreen(): StartScreen {
         return new StartScreen(
             (list) => {
-                this.listSignal.add(() => {
+                this.serverListSignal.add(() => {
                     this.onServerListSignal(list)
                 })
             },
             () => this.visitCreateServerScreen(),
-            () => { }
+            (serviceData) => {
+                this.client.connect(serviceData)
+            }
         )
     }
 
@@ -152,6 +168,19 @@ class ViewModel {
         }
         console.log("ListSignal - ", widget.items.size, ", ", this.qServerItems.size)
         widget.repaint()
+    }
+
+    serverOnMessage(msg: IMessage, id: string) {
+        switch(msg.messageType) {
+            case "hello": {
+                this.server.addNewName(randomUUID(), (msg as HelloMessage).name ?? "Unknown")
+                break
+            }
+            case "answer": {
+                this.server.addAnswer(id, (msg as AnswerMessage).answer ? 1 : 0)
+                break
+            }
+        }
     }
 }
 

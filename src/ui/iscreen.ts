@@ -6,9 +6,11 @@ export interface IScreen {
     screenStyleSheet: string
 
     init(data: any): void
+    deinit(): void
 }
 
 export enum ScreenType {
     StartScreen,
     CreateServerScreen,
+    ServerScreen
 }

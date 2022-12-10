@@ -23,6 +23,7 @@ export class CreateServerScreen implements IScreen {
     }
   `
   public init(_: any) { }
+  public deinit() { }
 
   public constructor(
     onServerStart: (name: string) => void,

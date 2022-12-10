@@ -1,4 +1,4 @@
-import { QMainWindow, QWidget, QLabel, FlexLayout, QPushButton, QListWidget, QTextEdit, QTextEditLineWrapMode, QListWidgetItem, QScreen, QBoxLayout, QFrame, QVariant } from '@nodegui/nodegui';
+import { QMainWindow, QWidget, QLabel, FlexLayout, QPushButton, QListWidget, QTextEdit, QTextEditLineWrapMode, QListWidgetItem, QScreen, QBoxLayout, QFrame, QVariant, QObject, ItemDataRole } from '@nodegui/nodegui';
 import { IScreen, ScreenType } from './iscreen';
 
 
@@ -24,6 +24,7 @@ export class StartScreen implements IScreen {
     }
     `
   public init(_: any) { }
+  public deinit() { }
 
   public constructor(
     subscribeListWidget: (lst: QListWidget) => void,
@@ -42,6 +43,9 @@ export class StartScreen implements IScreen {
     const lst_servers = new QListWidget();
     lst_servers.setObjectName("serverlist")
     subscribeListWidget(lst_servers)
+    lst_servers.addEventListener('itemClicked', (item) => {
+      onServerSelect(JSON.parse(item.data(ItemDataRole.UserRole).toString()))
+    })
 
     const btn_createServer = new QPushButton();
     btn_createServer.setText("Create Server");
