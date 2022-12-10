@@ -5,9 +5,9 @@ import { IScreen, ScreenType } from './iscreen';
 
 // init(name: string)
 // deinit(unsub: (QListWidget) => {})
-export class ServerScreen implements IScreen {
-  public type = ScreenType.ServerScreen
-  public mainWidget = new QWidget();
+export class WaitingScreen implements IScreen {
+  public type = ScreenType.WaitingScreen
+  public mainWidget = new QWidget()
   public screenStyleSheet =
     `
     #screenroot {
@@ -43,7 +43,6 @@ export class ServerScreen implements IScreen {
     title: string,
     subscribeListWidget: (lst: QListWidget) => MiniSignalBinding,
     unsubscribeListWidget: (bind: MiniSignalBinding) => void,
-    onStartGame: () => void,
     onBack: () => void
   ) {
     this.unsub = unsubscribeListWidget
@@ -60,17 +59,12 @@ export class ServerScreen implements IScreen {
     this.lst_players.setObjectName("playerlist")
     this.lst_bind = subscribeListWidget(this.lst_players)
 
-    const btn_gameStart = new QPushButton()
-    btn_gameStart.setText("Start");
-    btn_gameStart.addEventListener('clicked', onStartGame)
-
     const btn_back = new QPushButton()
     btn_back.setText("Back");
     btn_back.addEventListener('clicked', onBack)
 
     flx_rootLayout.addWidget(lbl_screenTitle)
     flx_rootLayout.addWidget(this.lst_players)
-    flx_rootLayout.addWidget(btn_gameStart)
     flx_rootLayout.addWidget(btn_back)
   }
 }

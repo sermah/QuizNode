@@ -12,5 +12,6 @@ export interface IScreen {
 export enum ScreenType {
     StartScreen,
     CreateServerScreen,
-    ServerScreen
+    ServerScreen,
+    WaitingScreen
 }

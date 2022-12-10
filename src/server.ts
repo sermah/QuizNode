@@ -5,6 +5,7 @@ import Bonjour, { Service } from "bonjour-service"
 import net, { Socket } from 'net'
 import { AccessDeniedMessage } from "./messages/access-denied-message"
 import { IMessage } from "./messages/imessage"
+import { PlayersMessage } from "./messages/players-message"
 import { fromJSONBytes, toJSON, toJSONBytes } from "./util/conversion"
 
 const PORT = 1369
@@ -20,7 +21,7 @@ export class Server {
   socketsByUUID: Map<string, Socket> = new Map()
   answersByUUID: Map<string, number> = new Map()
 
-  onMessage: (msg: IMessage, id: string) => void = () => {}
+  onMessage: (msg: IMessage, id: string, sock: Socket) => void = () => {}
 
   public get connections(): number {
     return this.server?.connections ?? 0
@@ -49,21 +50,28 @@ export class Server {
       sock.end()
     }
 
+    const sockClosed = () => {
+      this.removeSocket(sock)
+    }
 
     sock.on('end', () => {
       console.log(logtag, `Connection [${remoteAddress}] ended.`, )
+      sockClosed()
     })
 
     sock.on('error', (err) => {
       console.log(logtag, `Connection [${remoteAddress}] error: `, err.message)
+      sockClosed()
     })
 
     sock.on('timeout', () => {
       console.log(logtag, `Connection [${remoteAddress}] timeout.`)
+      sockClosed()
     })
 
     sock.on('close', () => {
       console.log(logtag, `Connection [${remoteAddress}] closed.`)
+      sockClosed()
     })
 
     sock.on('readable', () => {
@@ -79,14 +87,11 @@ export class Server {
       port: PORT,
       protocol: 'tcp'
     })
-    // advertise a http server on port 4321
-    // const ad = mdns.createAdvertisement(mdns.tcp('_quiz._tcp'), 1369)
-    // ad.start()
 
     this.server = net.createServer((sock) => this.onClientConnected(sock))  
 
     this.server.listen(PORT, () => {
-      console.log(logtag, 'Server listening on %j', this.server?.address())
+      console.log(logtag, 'Server listening on', this.server?.address())
     })
 
     console.log(logtag, "Started service \"" + name + '"')
@@ -99,19 +104,23 @@ export class Server {
     this.service = undefined
   }
 
-  // public async removeSocket(sock: Socket) {
-  //   var toRemove: string[] = []
-  //   this.socketsByUUID.forEach((val, key) => {
-  //     if (val == sock) toRemove.push(key)
-  //   })
-  //   toRemove.forEach((val, _) => {
-  //     this.socketsByUUID.delete(val)
-  //     this.namesByUUID.delete(val)
-  //     this.answersByUUID.delete(val)
-  //   })
-  // }
+  public async removeSocket(sock: Socket) {
+    var toRemove: string[] = []
+    this.socketsByUUID.forEach((val, key) => {
+      if (val == sock) toRemove.push(key)
+    })
+    toRemove.forEach((val, _) => {
+      this.socketsByUUID.delete(val)
+      this.namesByUUID.delete(val)
+      this.answersByUUID.delete(val)
+    })
+    this.sendPlayers()
+  }
 
   public async sendByID(data: any, to: string) {
+    console.log("Sending ")
+    if (data?.messageType)
+      console.log(data.messageType)
     var sock = this.socketsByUUID.get(to)
 
     if (sock) {
@@ -137,7 +146,9 @@ export class Server {
   }
 
   public async sendToAll(data: any) {
+    console.log("sending to all")
     for (const id of this.socketsByUUID.keys()) {
+      console.log("- ", id)
       this.sendByID(data, id)
     }
   }
@@ -152,7 +163,7 @@ export class Server {
     if (dataBuf) {
       var obj = fromJSONBytes(dataBuf)
 
-      if (obj?.messageType) this.onMessage(obj, this.findSocketUUID(sock))
+      if (obj?.messageType) this.onMessage(obj, this.findSocketUUID(sock), sock)
       else {
         console.log(logtag, "Received unknown data:\n", obj)
       }
@@ -174,10 +185,20 @@ export class Server {
       (this.answersByUUID.get(id) ?? 0) + answer)
   }
 
-  public addNewName(id: string, name: string) {
+  public addNewName(id: string, name: string, sock: Socket, cb: () => void) {
     this.namesByUUID.set(id, name)
     this.answersByUUID.set(id, 0)
+    this.socketsByUUID.set(id, sock)
+    this.sendPlayers()
+    cb()
     console.log(logtag, `Added Player - ${name}`)
   }
 
+  public sendPlayers() {
+    this.sendToAll(new PlayersMessage(
+      this.namesByUUID.size.toString(), 
+      this.maxPlayers.toString(), 
+      Array.from(this.namesByUUID.values())
+    ))
+  }
 }
