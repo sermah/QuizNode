@@ -1,7 +1,5 @@
 import { QListWidgetItem, ItemDataRole, QVariant, QListWidget } from "@nodegui/nodegui";
 import Bonjour, { Browser, Service } from "bonjour-service";
-import { on } from "events";
-import { randomUUID } from "crypto"
 import MiniSignal from "mini-signals";
 import { Client } from "./client";
 import { IMessage } from "./messages/imessage";
@@ -13,10 +11,9 @@ import { StartScreen } from "./ui/start-screen";
 import { HelloMessage } from "./messages/hello-message";
 import { AnswerMessage } from "./messages/answer-message";
 import { ServerScreen } from "./ui/server-screen";
-import { Console } from "console";
 import { PlayersMessage } from "./messages/players-message";
 import { WaitingScreen } from "./ui/waiting-screen";
-import { Socket } from "net";
+import { Connection } from "./connection";
 
 
 class ViewModel {
@@ -42,18 +39,15 @@ class ViewModel {
   onClientDisconnect: () => void = () => { }
 
   constructor() {
-    this.client.onConnect = () => this.onClientConnect()
-    this.client.onDisconnect = () => this.onClientDisconnect()
-
-    this.onClientConnect = () => {
+    this.client.onConnect = () => {
       console.log("Connected");
     }
 
-    this.onClientDisconnect = () => {
+    this.client.onDisconnect = () => {
       navigation.goBackUntil(ScreenType.StartScreen)
     }
 
-    this.server.onMessage = (msg, id, sock) => this.serverOnMessage(msg, id, sock)
+    this.server.onMessage = (msg, conn) => this.serverOnMessage(msg, conn)
     this.client.onMessage = (msg) => this.clientOnMessage(msg)
   }
 
@@ -67,8 +61,8 @@ class ViewModel {
     })
 
     this.browser.on("down", function (service: any) {
-      console.log('Unpublishing:', service.name)
-      console.log('Data:\n', service)
+      console.log('Server down:', service.name)
+      // console.log('Data:\n', service)
       viewModel.updateServices()
       viewModel.printServers()
     })
@@ -132,7 +126,7 @@ class ViewModel {
       },
       () => this.visitCreateServerScreen(),
       (serviceData) => {
-        this.client.connect(serviceData)
+        this.client.connect(serviceData, "Player")
         navigation.goTo(this.makeWaitingScreen(
           (serviceData as Service).name,
         ), null)
@@ -224,20 +218,19 @@ class ViewModel {
     widget.repaint()
   }
 
-  serverOnMessage(msg: IMessage, id: string, sock: Socket) {
+  serverOnMessage(msg: IMessage, conn: Connection) {
     switch (msg.messageType) {
       case "hello": {
-        this.server.addNewName(randomUUID(), (msg as HelloMessage).name ?? "Unknown",
-          sock,
+        this.server.addNewName(conn, (msg as HelloMessage).name ?? "Unknown",
           () => {
-            this.players = Array.from(this.server.namesByUUID.values())
+            this.players = Array.from(this.server.namesByID.values())
             this.updatePlayers()
           }
         )
         break
       }
       case "answer": {
-        this.server.addAnswer(id, (msg as AnswerMessage).answer ? 1 : 0)
+        this.server.addAnswer(conn.id, (msg as AnswerMessage).answer ? 1 : 0)
         break
       }
     }
