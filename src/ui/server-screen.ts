@@ -10,20 +10,8 @@ export class ServerScreen implements IScreen {
   public mainWidget = new QWidget();
   public screenStyleSheet =
     `
-    #screenroot {
-      width: 720px;
-      height: 640px;
-      background-color: #fff;
-      align-items: 'center';
-      justify-content: 'center';
-    }
-    #screentitle {
-      font-size: 24px;
-      font-weight: bold;
-      padding: 1;
-    }
     #servername {
-      height: 36px; 
+      height: 36px;
     }
   `
   public serverName = "untitled"
@@ -55,17 +43,21 @@ export class ServerScreen implements IScreen {
 
     const lbl_screenTitle = new QLabel()
     lbl_screenTitle.setObjectName("screentitle")
-    lbl_screenTitle.setText(`Game - ${title}`)
+    lbl_screenTitle.setText(`Вы проводите - ${title}`)
 
     this.lst_players.setObjectName("playerlist")
     this.lst_bind = subscribeListWidget(this.lst_players)
 
     const btn_gameStart = new QPushButton()
-    btn_gameStart.setText("Start");
-    btn_gameStart.addEventListener('clicked', onStartGame)
+    btn_gameStart.setText("Начать")
+    btn_gameStart.addEventListener('clicked', () => {
+      btn_gameStart.clearFocus()
+      btn_gameStart.setEnabled(false)
+      onStartGame()
+    })
 
     const btn_back = new QPushButton()
-    btn_back.setText("Back");
+    btn_back.setText("Отменить");
     btn_back.addEventListener('clicked', onBack)
 
     flx_rootLayout.addWidget(lbl_screenTitle)

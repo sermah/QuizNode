@@ -14,6 +14,12 @@ import { ServerScreen } from "./ui/server-screen";
 import { PlayersMessage } from "./messages/players-message";
 import { WaitingScreen } from "./ui/waiting-screen";
 import { Connection } from "./connection";
+import { QuestionScreen } from "./ui/question-screen";
+import { QuestionMessage } from "./messages/question-message";
+import { ResultsScreen } from "./ui/results-screen";
+import { ResultsMessage } from "./messages/results-message";
+import { QuizPickScreen } from "./ui/quiz-pick-screen";
+import { readQuiz } from "./util/filereader";
 
 
 class ViewModel {
@@ -38,17 +44,41 @@ class ViewModel {
   onClientConnect: () => void = () => { }
   onClientDisconnect: () => void = () => { }
 
+  public questionUpdateSignal = new MiniSignal()
+
+  public currentGameTitle = ""
+  public myScore = 0
+
+  public currentQuizFile = ""
+
   constructor() {
     this.client.onConnect = () => {
       console.log("Connected");
     }
 
     this.client.onDisconnect = () => {
-      navigation.goBackUntil(ScreenType.StartScreen)
+      if (!navigation.screenIs(ScreenType.ResultsScreen))
+        navigation.goBackUntil(ScreenType.StartScreen)
     }
 
     this.server.onMessage = (msg, conn) => this.serverOnMessage(msg, conn)
     this.client.onMessage = (msg) => this.clientOnMessage(msg)
+
+    this.server.onGameEnd = (rm) => {
+      navigation.goTo(
+        new ResultsScreen(
+          this.currentGameTitle,
+          rm as ResultsMessage,
+          undefined,
+          () => {
+            navigation.goBackUntil(ScreenType.StartScreen)
+          }
+        ),
+        null
+      )
+    }
+
+    this.server.loadGame()
   }
 
   public browseServers() {
@@ -125,8 +155,10 @@ class ViewModel {
         })
       },
       () => this.visitCreateServerScreen(),
-      (serviceData) => {
-        this.client.connect(serviceData, "Player")
+      (serviceData, nick) => {
+        this.myScore = 0
+        this.client.connect(serviceData, nick)
+        this.currentGameTitle = (serviceData as Service).name
         navigation.goTo(this.makeWaitingScreen(
           (serviceData as Service).name,
         ), null)
@@ -138,8 +170,29 @@ class ViewModel {
     return new CreateServerScreen(
       (name) => this.createServer(name),
       () => {
+        navigation.goTo(
+          new QuizPickScreen(
+            this.server.questions,
+            this.currentQuizFile,
+            (nfn, cb) => {
+              readQuiz(
+                nfn, (name, qs) => {
+                  this.server.questions = qs
+                  this.currentQuizFile = name
+                  if (cb) cb(this.server.questions, name)
+                }
+              )
+            },
+            () => {
+              navigation.goBack()
+            }
+          ),
+          null
+        )
+      },
+      () => {
         this.returnBack()
-      }
+      },
     )
   }
 
@@ -154,6 +207,7 @@ class ViewModel {
         this.playerListSignal.detach(bind),
       () => {
         console.log("Start")
+        this.server.startGame(this.server.questionSecs)
       },
       () => {
         this.server.stop()
@@ -244,12 +298,74 @@ class ViewModel {
         break
       }
       case "question": {
+        var que = msg as QuestionMessage
+        if (!navigation.screenIs(ScreenType.QuestionScreen))
+        navigation.goTo(
+          new QuestionScreen(que,
+            this.server.questionSecs,
+            (qc) => {
+              return this.questionUpdateSignal.add((q: QuestionMessage) => {
+                qc(q)
+                que = q
+              })
+            },
+            (ansNum) => {
+            var check = false
+            switch (ansNum) {
+              case 0: {
+                console.log(`Answered: ${que.firstAnswer}`)
+                check = que.firstAnswer == que.answer
+                break
+              }
+              case 1: {
+                console.log(`Answered: ${que.secondAnswer}`)
+                check = que.secondAnswer == que.answer
+                break
+              }
+              case 2: {
+                console.log(`Answered: ${que.thirdAnswer}`)
+                check = que.thirdAnswer == que.answer
+                break
+              }
+              case 3: {
+                console.log(`Answered: ${que.fourthAnswer}`)
+                check = que.fourthAnswer == que.answer
+                break
+              }
+            }
+            console.log(`Right answer: ${que.answer}. Check = ${check}`)
+            if (check) {
+              this.client.send(new AnswerMessage(check))
+              this.myScore++
+            }
+          },
+          () => {
+            this.client.disconnect()
+          }
+          ),
+          null
+        )
+        else this.questionUpdateSignal.dispatch(que)
         break
       }
       case "results": {
+        console.log(msg as ResultsMessage)
+        navigation.goTo(
+          new ResultsScreen(
+            this.currentGameTitle,
+            msg as ResultsMessage,
+            this.myScore,
+            () => {
+              this.client.disconnect()
+              navigation.goBackUntil(ScreenType.StartScreen)
+            }
+          ),
+          null
+        )
         break
       }
       case "accessDenied": {
+        this.client.disconnect()
         break
       }
     }

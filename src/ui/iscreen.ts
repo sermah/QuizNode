@@ -14,5 +14,7 @@ export enum ScreenType {
     CreateServerScreen,
     ServerScreen,
     WaitingScreen,
-    QuestionScreen
+    ResultsScreen,
+    QuestionScreen,
+    QuizPickScreen
 }

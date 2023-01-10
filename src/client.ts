@@ -29,5 +29,8 @@ export class Client {
   public disconnect() {
     this.connection.disconnect()
   }
-  
+
+  public send(data: any) {
+    this.connection.send(data)
+  }
 }

@@ -7,15 +7,9 @@ export function toJSONBytes(thing: any): Uint8Array {
 }
 
 export function fromJSONBytes(bytes: Uint8Array): any {
-    if (!bytes || bytes.length == 0) return undefined 
+    if (!bytes || bytes.length == 0) return undefined
 
-    var str = ""
-   
-    bytes.forEach(b => {
-        str += String.fromCharCode(b)
-    })
-
-    return JSON.parse(str)
+    return JSON.parse(new TextDecoder().decode(bytes))
 }
 
 export function toJSON(thing: any): string {
@@ -23,5 +17,5 @@ export function toJSON(thing: any): string {
 }
 
 export function fromJSON(text: string): any {
-   return JSON.parse(text)
+    return JSON.parse(text)
 }

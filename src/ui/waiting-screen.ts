@@ -9,23 +9,7 @@ export class WaitingScreen implements IScreen {
   public type = ScreenType.WaitingScreen
   public mainWidget = new QWidget()
   public screenStyleSheet =
-    `
-    #screenroot {
-      width: 720px;
-      height: 640px;
-      background-color: #fff;
-      align-items: 'center';
-      justify-content: 'center';
-    }
-    #screentitle {
-      font-size: 24px;
-      font-weight: bold;
-      padding: 1;
-    }
-    #servername {
-      height: 36px; 
-    }
-  `
+    ``
   public serverName = "untitled"
   lst_bind: MiniSignalBinding | undefined
   unsub: (bind: MiniSignalBinding) => void = () => {}
@@ -54,13 +38,13 @@ export class WaitingScreen implements IScreen {
 
     const lbl_screenTitle = new QLabel()
     lbl_screenTitle.setObjectName("screentitle")
-    lbl_screenTitle.setText(`Game - ${title}`)
+    lbl_screenTitle.setText(`Игра - ${title}`)
 
     this.lst_players.setObjectName("playerlist")
     this.lst_bind = subscribeListWidget(this.lst_players)
 
     const btn_back = new QPushButton()
-    btn_back.setText("Back");
+    btn_back.setText("Покинуть игру");
     btn_back.addEventListener('clicked', onBack)
 
     flx_rootLayout.addWidget(lbl_screenTitle)

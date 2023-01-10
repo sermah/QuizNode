@@ -1,8 +1,8 @@
 import { IMessage } from './imessage'
 
-export class HelloMessage implements IMessage {
-  public messageType = "hello"
-  public results: Map<string, number>
+export class ResultsMessage implements IMessage {
+  public messageType = "results"
+  public results: [string, any][]
 
-  constructor(results: Map<string, number>) { this.results = results }
+  constructor(results: [string, any][]) { this.results = results }
 }

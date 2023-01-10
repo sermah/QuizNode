@@ -7,6 +7,8 @@ import { Connection } from "./connection"
 import { AccessDeniedMessage } from "./messages/access-denied-message"
 import { IMessage } from "./messages/imessage"
 import { PlayersMessage } from "./messages/players-message"
+import { QuestionMessage } from "./messages/question-message"
+import { ResultsMessage } from "./messages/results-message"
 import { fromJSONBytes, toJSON, toJSONBytes } from "./util/conversion"
 
 const PORT = 1369
@@ -17,17 +19,23 @@ export class Server {
   service: Service | undefined
   server: net.Server | undefined
   maxPlayers: number
-  
-  connsByID:    Map<string, Connection> = new Map()
-  answersByID:  Map<string, number> = new Map()
-  namesByID:    Map<string, string> = new Map()
 
-  onMessage: (msg: IMessage, conn: Connection) => void = () => {}
+  connsByID: Map<string, Connection> = new Map()
+  answersByID: Map<string, number> = new Map()
+  namesByID: Map<string, string> = new Map()
+
+  currentQuestion: number = 0
+  questions: QuestionMessage[] = []
+  gameTimer: NodeJS.Timer | undefined
+  questionSecs: number = 10
+
+  onMessage: (msg: IMessage, conn: Connection) => void = () => { }
+  onGameEnd: (rm: ResultsMessage) => void = () => {}
 
   public get players(): number {
     return this.namesByID.size
   }
-  
+
   constructor(
     bonjour: Bonjour,
     maxPlayers: number
@@ -48,22 +56,22 @@ export class Server {
     }
 
     var newConn = new Connection(
-      sock, logtag, false,
-      () => {},
+      sock, logtag, true,
+      () => { },
       () => { this.removeConnection(newConn) },
       (msg) => { this.onMessage(msg, newConn) }
     )
   }
-  
+
   public start(name: string) {
-    this.service = this.bonjour.publish({ 
-      name: name, 
-      type: 'quiz', 
+    this.service = this.bonjour.publish({
+      name: name,
+      type: 'quiz',
       port: PORT,
       protocol: 'tcp'
     })
 
-    this.server = net.createServer((sock) => this.onClientConnected(sock))  
+    this.server = net.createServer((sock) => this.onClientConnected(sock))
 
     this.server.listen(PORT, () => {
       console.log(logtag, 'Server listening on', this.server?.address())
@@ -72,11 +80,20 @@ export class Server {
     console.log(logtag, "Started service \"" + name + '"')
   }
 
-  public async stop() {
-    console.log(logtag, "Stopping services...")
+  public async hide() {
+    console.log(logtag, "Hiding server. Stopping accepting connections...")
     this.bonjour.unpublishAll()
     this.server?.close()
     this.service = undefined
+  }
+
+  public async stop() {
+    this.hide()
+    this.connsByID.forEach(con => {
+      con.disconnect()
+    })
+    this.connsByID.clear()
+    clearInterval(this.gameTimer)
   }
 
   public async removeConnection(conn: Connection) {
@@ -91,13 +108,56 @@ export class Server {
       conn.send(data)
     }
   }
-  
+
   // Game
 
   public addAnswer(id: string, answer: number) {
-    console.log(this.namesByID.get)
-    this.answersByID.set(id, 
+    console.log(this.namesByID.get(id))
+    this.answersByID.set(id,
       (this.answersByID.get(id) ?? 0) + answer)
+  }
+
+  public loadGame() {
+    this.questions = []
+  }
+
+  public startGame(sec: number) {
+    this.hide()
+    this.questionSecs = sec
+    this.currentQuestion = 0
+    this.sendQuestion()
+    this.currentQuestion++
+    this.gameTimer = setInterval(() => {
+      if (this.currentQuestion == this.questions.length) {
+        this.endGame()
+        clearInterval(this.gameTimer)
+        return
+      }
+      this.sendQuestion()
+      this.currentQuestion++
+    }, this.questionSecs * 1000)
+  }
+
+  public sendQuestion() {
+    console.log(logtag, `Question ${this.currentQuestion + 1} of ${this.questions.length}`)
+    var q = this.questions[this.currentQuestion]
+    q.questionsAmount = [this.currentQuestion + 1, this.questions.length]
+    this.sendToAll(q)
+  }
+
+  public endGame() {
+    var results: [string, any][] = []
+    this.answersByID.forEach((v, k, m) => {
+      results.push([this.namesByID.get(k) ?? "Undefined", v])
+    });
+    results.sort((a, b) => b[1] - a[1])
+    console.log(logtag, results)
+    var resMsg = new ResultsMessage(results)
+    this.sendToAll(resMsg)
+    this.onGameEnd(resMsg)
+    this.answersByID.clear()
+    this.namesByID.clear()
+    this.stop()
   }
 
   public addNewName(conn: Connection, name: string, cb: () => void) {
@@ -111,9 +171,10 @@ export class Server {
 
   public sendPlayers() {
     this.sendToAll(new PlayersMessage(
-      this.namesByID.size.toString(), 
-      this.maxPlayers.toString(), 
+      this.namesByID.size.toString(),
+      this.maxPlayers.toString(),
       Array.from(this.namesByID.values())
     ))
   }
+
 }

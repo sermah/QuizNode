@@ -16,7 +16,7 @@ export class Connection {
   onMessage: (msg: IMessage) => void = () => { }
 
   constructor(
-    socket?: net.Socket, 
+    socket?: net.Socket,
     logtag?: string,
     doLog?: boolean,
     onConnect?: () => void,
@@ -33,17 +33,14 @@ export class Connection {
 
     this.socket.on('end', () => {
       this.log('Connection ended.')
-      this.onDisconnect()
     })
 
     this.socket.on('error', (err) => {
       this.log('Connection error: ', err.message)
-      this.onDisconnect()
     })
 
     this.socket.on('timeout', () => {
       this.log('Connection timeout.')
-      this.onDisconnect()
     })
 
     this.socket.on('close', () => {
@@ -71,10 +68,11 @@ export class Connection {
   public async send(data: any) {
     const jdata = JSON.stringify(data)
     const jsize = (new TextEncoder().encode(jdata)).length
+    // this.log("Sending ", jsize, " bytes")
     const arr = new ArrayBuffer(2)
-    const u16 = new Uint16Array(arr)
     const u8s = new Uint8Array(arr)
-    u16[0] = jsize
+    u8s[0] = jsize / 256
+    u8s[1] = jsize % 256
 
     this.socket.write(u8s, (err) => {
       if (err) {
@@ -90,35 +88,35 @@ export class Connection {
 
   public async receive() {
     if (this.bytesRead == this.bytesTotal) {
-      var total = (new Uint16Array(this.socket.read(2)))[0]
-      if (!total)
-      return
+      var bytes: ArrayBuffer = this.socket.read(2)
+      if (!bytes) return
+      var total = (new Uint8Array(bytes))[0] * 256 + (new Uint8Array(bytes))[1]
       this.bytesRead = 0
       this.bytesTotal = total
       this.readBuffer = new Uint8Array(this.bytesTotal)
-      this.log("Gonna read ", this.bytesTotal, " bytes")
+      // this.log("Reading ", this.bytesTotal, " bytes")
     }
 
-    
+
     if (this.bytesTotal == this.bytesRead)
       return
-    
+
     var dataBuf: Uint8Array = this.socket.read(this.bytesTotal)
-    
+
     if (dataBuf) {
       this.readBuffer.set(dataBuf, this.bytesRead)
       this.bytesRead += dataBuf.byteLength
-      
+
       if (this.bytesRead == this.bytesTotal) {
         var obj = fromJSONBytes(dataBuf)
-        
+
         if (obj?.messageType) this.onMessage(obj)
         else {
           this.log("Received unknown data:\n", obj)
         }
       }
     }
-    this.log("Left ", this.bytesRead, " bytes")
+    // this.log("Read ", this.bytesRead, " bytes")
   }
 
   private log(...args: any[]) {

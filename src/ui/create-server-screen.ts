@@ -6,20 +6,8 @@ export class CreateServerScreen implements IScreen {
   public mainWidget = new QWidget();
   public screenStyleSheet =
     `
-    #screenroot {
-      width: 720px;
-      height: 640px;
-      background-color: #fff;
-      align-items: 'center';
-      justify-content: 'center';
-    }
-    #screentitle {
-      font-size: 24px;
-      font-weight: bold;
-      padding: 1;
-    }
     #servername {
-      height: 36px; 
+      height: 30px;
     }
   `
   public init(_: any) { }
@@ -27,6 +15,7 @@ export class CreateServerScreen implements IScreen {
 
   public constructor(
     onServerStart: (name: string) => void,
+    onSelectQuiz: () => void,
     onBack: () => void
   ) {
     this.mainWidget.setObjectName("screenroot");
@@ -36,27 +25,35 @@ export class CreateServerScreen implements IScreen {
 
     const lbl_screenTitle = new QLabel();
     lbl_screenTitle.setObjectName("screentitle");
-    lbl_screenTitle.setText("Create Server");
+    lbl_screenTitle.setText("Создать сервер");
 
     const ted_serverName = new QTextEdit();
     ted_serverName.setObjectName("servername");
-    ted_serverName.setPlaceholderText("Server Name");
+    ted_serverName.setPlaceholderText("Название сервера");
     ted_serverName.setAcceptRichText(false);
     ted_serverName.setLineWrapMode(QTextEditLineWrapMode.NoWrap);
 
+    const btn_selectQuiz = new QPushButton();
+    btn_selectQuiz.setText("Выбрать викторину");
+    btn_selectQuiz.addEventListener('clicked', (_) => {
+      onSelectQuiz()
+    })
+    btn_selectQuiz.setInlineStyle("margin-top: 8px;")
+
     const btn_serverCreate = new QPushButton();
-    btn_serverCreate.setText("Create");
+    btn_serverCreate.setText("Создать");
     btn_serverCreate.addEventListener('clicked', (_) => {
       var name = ted_serverName.toPlainText();
       if (name.length != 0) onServerStart(name);
     })
 
     const btn_back = new QPushButton();
-    btn_back.setText("Back");
+    btn_back.setText("Назад");
     btn_back.addEventListener('clicked', onBack)
 
     flx_rootLayout.addWidget(lbl_screenTitle);
     flx_rootLayout.addWidget(ted_serverName);
+    flx_rootLayout.addWidget(btn_selectQuiz);
     flx_rootLayout.addWidget(btn_serverCreate);
     flx_rootLayout.addWidget(btn_back);
   }
